@@ -94,13 +94,3 @@ sudo usermod -aG docker ubuntu
 ```
 
 ---
-
-## 🚀 Despliegue a GitHub
-
-Cuando hayas guardado el archivo, ejecuta estos tres comandos para actualizar el repositorio:
-
-```bash
-git add README.md
-git commit -m "docs: actualizar README con la documentación oficial del proyecto"
-git push origin main
-```
