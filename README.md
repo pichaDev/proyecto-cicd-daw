@@ -93,4 +93,3 @@ Adicionalmente, se configuraron los privilegios del socket de Unix para permitir
 sudo usermod -aG docker ubuntu
 ```
 
----
