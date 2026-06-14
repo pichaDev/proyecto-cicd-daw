@@ -1,0 +1,66 @@
+name: Pipeline Automático de CI/CD
+
+# 1. DISPARADOR (TRIGGER)
+on:
+  push:
+    branches: [ "main" ]
+
+# 2. TRABAJOS (JOBS)
+jobs:
+
+  # --- ETAPA 1: INTEGRACIÓN CONTINUA (CI) ---
+  build-and-push:
+    runs-on: ubuntu-latest # Se ejecuta en una máquina virtual limpia que nos presta GitHub
+    steps:
+    - name: Clonar el código del repositorio
+      uses: actions/checkout@v4
+
+    - name: Autenticarse en Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_HUB_USERNAME }}
+        password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+    - name: Compilar Dockerfile y subir imagen
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        # Creamos dos etiquetas: 'latest' para producción y el SHA del commit para tener un histórico único
+        tags: |
+          ${{ secrets.DOCKER_HUB_USERNAME }}/mi-app-web:latest
+          ${{ secrets.DOCKER_HUB_USERNAME }}/mi-app-web:${{ github.sha }}
+
+  # --- ETAPA 2: DESPLIEGUE CONTINUO (CD) ---
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push # CRUCIAL: No se ejecuta si la compilación de arriba falla
+    steps:
+    - name: Conexión por SSH a AWS EC2 y Despliegue en Caliente
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # 1. Descargar la última versión de la imagen que acabamos de subir a Docker Hub
+          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/mi-app-web:latest
+          
+          # 2. Detener y eliminar el contenedor antiguo si ya existía en el servidor
+          # El '|| true' evita que el pipeline falle si es la primera vez que se ejecuta y no encuentra nada
+          docker stop mi-app-contenedor || true
+          docker rm mi-app-contenedor || true
+          
+          # 3. Lanzar el nuevo contenedor vinculando el puerto 80 de la EC2 con el 80 del contenedor
+          docker run -d --name mi-app-contenedor -p 80:80 ${{ secrets.DOCKER_HUB_USERNAME }}/mi-app-web:latest
+          
+          # 4. COMPROBACIÓN AUTOMÁTICA DE SALUD (HEALTH-CHECK)
+          echo "Iniciando verificación del estado del servicio..."
+          sleep 5 # Damos 5 segundos de margen para que el proceso Node.js arranque su servidor web
+          
+          # Realizamos una petición interna en la EC2. 
+          # El flag '--fail' obliga a curl a devolver un código de error de salida (1) si recibe un HTTP 404 o 500.
+          # Si curl falla, el operador '||' ejecuta el bloque derecho, lanzando un 'exit 1' que romperá el pipeline de GitHub Actions.
+          curl --fail --silent http://localhost || (echo "❌ ERROR: La web no responde tras el despliegue" && exit 1)
+          
+          echo "✅ ÉXITO: Despliegue verificado correctamente en producción"
