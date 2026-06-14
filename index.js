@@ -6,7 +6,7 @@ const PORT = process.env.PORT || 80;
 app.get('/', (req, res) => {
     res.status(200).send(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 10%;">
-            <h1>🚀 Servidor Desplegado con Webos</h1>
+            <h1>🚀 Servidor Desplegado con Éxito</h1>
             <p>Pipeline de CI/CD funcionando mediante GitHub Actions, Docker Hub y AWS EC2.</p>
             <div style="display: inline-block; padding: 10px 20px; background-color: #28a745; color: white; border-radius: 5px;">
                 Estado: ONLINE
